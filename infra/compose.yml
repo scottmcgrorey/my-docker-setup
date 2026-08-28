@@ -1,0 +1,291 @@
+services:
+  # --- UTILITIES ---
+  watchtower:
+    image: containrrr/watchtower:latest
+    container_name: watchtower
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - DOCKER_API_VERSION=1.44
+    command: --cleanup --interval 86400
+    restart: unless-stopped
+    networks:
+      - media_net # To monitor other media containers
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+        reservations:
+          memory: 32M
+
+  mongodb:
+    image: mongo:4.4.29
+    container_name: mongo_arr
+    volumes:
+      - /dockerfiles/infra/mongodb_data:/data/db
+    restart: unless-stopped
+    networks:
+      - media_net # Kept here as it likely serves various media services
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 128M
+
+  homepage:
+    image: ghcr.io/gethomepage/homepage:latest
+    container_name: homepage
+    env_file: .env
+    ports:
+      - 3005:3000
+    volumes:
+      - /dockerfiles/infra/homepage/config:/app/config
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    restart: unless-stopped
+    environment:
+      - TZ=America/New_York
+      - HOMEPAGE_ALLOWED_HOSTS=*
+      - SONARR_KEY=${SONARR_KEY}
+      - RADARR_KEY=${RADARR_KEY}
+    networks:
+      - media_net   # To scrape Sonarr/Radarr
+      - proxy_net   # To be reached by NPM
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 96M
+
+  vaultwarden:
+    image: vaultwarden/server:latest
+    container_name: vaultwarden
+    ports:
+      - 9080:80
+    restart: unless-stopped
+    environment:
+      - SIGNUPS_ALLOWED=true
+      - DOMAIN=https://vault.mcgrorey.net
+    volumes:
+      - /dockerfiles/infra/vaultwarden_data:/data
+    networks:
+      - proxy_net   # Accessible via web only
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 32M
+
+  # --- AUTHENTIK SECTION ---
+  authentik-postgresql:
+    image: postgres:16-alpine
+    container_name: authentik-db
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
+      start_period: 20s
+      interval: 30s
+      retries: 5
+    volumes:
+      - /dockerfiles/infra/database:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: authentik
+      POSTGRES_USER: authentik
+      POSTGRES_PASSWORD: ${PG_PASS}
+    networks:
+      - auth_internal
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 64M
+
+  authentik-redis:
+    image: redis:alpine
+    container_name: authentik-redis
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
+      start_period: 10s
+      interval: 30s
+      retries: 5
+    networks:
+      - auth_internal
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+        reservations:
+          memory: 16M
+
+  authentik-server:
+    image: ghcr.io/goauthentik/server
+    container_name: authentik-server
+    user: "1000:1000"
+    command: server
+    environment:
+      AUTHENTIK_REDIS__HOST: authentik-redis
+      AUTHENTIK_POSTGRESQL__HOST: authentik-postgresql
+      AUTHENTIK_POSTGRESQL__USER: authentik
+      AUTHENTIK_POSTGRESQL__NAME: authentik
+      AUTHENTIK_POSTGRESQL__PASSWORD: ${PG_PASS}
+      AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY}
+    volumes:
+      - /dockerfiles/infra/authentik:/media
+      - /dockerfiles/infra/authentik/custom-templates:/templates
+    networks:
+      - auth_internal
+      - proxy_net
+    depends_on:
+      authentik-postgresql:
+        condition: service_healthy
+      authentik-redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 1536M
+        reservations:
+          memory: 512M
+
+  authentik-worker:
+    image: ghcr.io/goauthentik/server
+    container_name: authentik-worker
+    command: worker
+    restart: unless-stopped
+    environment:
+      AUTHENTIK_REDIS__HOST: authentik-redis
+      AUTHENTIK_POSTGRESQL__HOST: authentik-postgresql
+      AUTHENTIK_POSTGRESQL__USER: authentik
+      AUTHENTIK_POSTGRESQL__NAME: authentik
+      AUTHENTIK_POSTGRESQL__PASSWORD: ${PG_PASS}
+      AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY}
+    volumes:
+      - /dockerfiles/infra/authentik:/media
+      - /dockerfiles/infra/authentik/custom-templates:/templates
+    networks:
+      - auth_internal
+      - media_net # Added so it can talk to other local services if needed for forward-auth
+    depends_on:
+      - authentik-postgresql
+      - authentik-redis
+    deploy:
+      resources:
+        limits:
+          memory: 1024M
+        reservations:
+          memory: 256M
+
+  # --- NETBOX SECTION ---
+  netbox-db:
+    image: postgres:16-alpine
+    container_name: netbox-db
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
+      start_period: 20s
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    environment:
+      POSTGRES_DB: netbox
+      POSTGRES_USER: netbox
+      POSTGRES_PASSWORD: ${NETBOX_DB_PASS}
+    volumes:
+      - /dockerfiles/infra/netbox/db:/var/lib/postgresql/data
+    networks:
+      - netbox_internal
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 64M
+
+  netbox-redis:
+    image: redis:7-alpine
+    container_name: netbox-redis
+    networks:
+      - netbox_internal
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+        reservations:
+          memory: 16M
+
+  netbox:
+    image: netbox-custom:latest
+    build:
+      context: .
+      dockerfile_inline: |
+        FROM netboxcommunity/netbox:latest
+        COPY local_requirements.txt /opt/netbox/
+        RUN /opt/netbox/venv/bin/pip install --no-cache-dir -r /opt/netbox/local_requirements.txt
+    container_name: netbox
+    depends_on:
+      netbox-db:
+        condition: service_healthy
+      netbox-redis:
+        condition: service_started
+    environment:
+      - DB_HOST=netbox-db
+      - DB_NAME=netbox
+      - DB_USER=netbox
+      - DB_PASSWORD=${NETBOX_DB_PASS}
+      - REDIS_HOST=netbox-redis
+      - SECRET_KEY=${NETBOX_SECRET_KEY}
+      - ALLOWED_HOSTS=*
+      - API_TOKEN_PEPPERS=['${API_TOKEN_PEPPERS_SECRET}']
+      - TZ=America/New_York
+      - SKIP_SUPERUSER=true
+      - PLUGINS=netbox_unifi_sync
+    ports:
+      - "8085:8080"
+    volumes:
+      - /dockerfiles/infra/netbox/media:/opt/netbox/netbox/media
+      - /dockerfiles/infra/netbox/reports:/opt/netbox/netbox/reports
+      - /dockerfiles/infra/netbox/scripts:/opt/netbox/netbox/scripts
+    networks:
+      - netbox_internal
+      - proxy_net
+    deploy:
+      resources:
+        limits:
+          memory: 1024M
+        reservations:
+          memory: 256M
+
+  netbox-worker:
+    image: netbox-custom:latest
+    container_name: netbox-worker
+    depends_on:
+      - netbox
+    command: /opt/netbox/venv/bin/python3 /opt/netbox/netbox/manage.py rqworker
+    environment:
+      - DB_HOST=netbox-db
+      - DB_NAME=netbox
+      - DB_USER=netbox
+      - DB_PASSWORD=${NETBOX_DB_PASS}
+      - REDIS_HOST=netbox-redis
+      - SECRET_KEY=${NETBOX_SECRET_KEY}
+      - API_TOKEN_PEPPERS=['${API_TOKEN_PEPPERS_SECRET}']
+      - PLUGINS=netbox_unifi_sync
+    networks:
+      - netbox_internal
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 128M
+
+networks:
+  media_net:
+    external: true
+  proxy_net:
+    external: true
+  auth_internal:
+    internal: true
+  netbox_internal:
+    internal: true

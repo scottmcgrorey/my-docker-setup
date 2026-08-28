@@ -1,0 +1,233 @@
+services:
+  # --- KOMODO SECTION ---
+  mongo:
+    image: mongo:4.4.29
+    container_name: komodo-mongo
+    labels:
+      komodo.skip: ""
+    command: --quiet --wiredTigerCacheSizeGB 0.25
+    restart: unless-stopped
+    volumes:
+      - /dockerfiles/automation/mongo-data:/data/db
+      - /dockerfiles/automation/mongo-config:/data/configdb
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${KOMODO_DB_USERNAME:-komodo}
+      MONGO_INITDB_ROOT_PASSWORD: ${KOMODO_DB_PASSWORD:-komodo}
+    networks:
+      - komodo_internal
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 128M
+
+  core:
+    image: ghcr.io/moghtech/komodo-core:latest
+    container_name: komodo-core
+    labels:
+      komodo.skip: ""
+    restart: unless-stopped
+    depends_on:
+      - mongo
+    ports:
+      - 9120:9120
+    env_file: /dockerfiles/automation/compose.env
+    environment:
+      KOM_DATABASE_ADDRESS: komodo-mongo:27017
+      KOM_DATABASE_USERNAME: ${KOMODO_DB_USERNAME:-komodo}
+      KOM_DATABASE_PASSWORD: ${KOMODO_DB_PASSWORD:-komodo}
+    volumes:
+      - /dockerfiles/automation/backups:/backups
+    networks:
+      - automation_net
+      - komodo_internal
+      - proxy_net      # If accessed via domain
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 64M
+
+  periphery:
+    image: ghcr.io/moghtech/komodo-periphery:latest
+    container_name: komodo-periphery
+    labels:
+      komodo.skip: ""
+    restart: unless-stopped
+    env_file: /dockerfiles/automation/compose.env
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /proc:/proc
+      - /etc/komodo:/etc/komodo
+    networks:
+      - automation_net
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 32M
+
+  # --- SMART HOME SECTION ---
+  mqtt:
+    image: eclipse-mosquitto
+    container_name: mqtt
+    user: "1000:1000"
+    restart: unless-stopped
+    volumes:
+      - /dockerfiles/automation/mqtt/config:/mosquitto/config
+      - /dockerfiles/automation/mqtt/data:/mosquitto/data
+      - /dockerfiles/automation/mqtt/log:/mosquitto/log
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    networks:
+      - automation_net
+      - proxy_net
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+        reservations:
+          memory: 16M
+
+  ambient-exporter:
+    image: philosowaffle/ambientweather-local-server:latest
+    container_name: ambient-exporter
+    restart: unless-stopped
+    ports:
+      - "12080:8080"
+    networks:
+      - automation_net
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+        reservations:
+          memory: 32M
+
+  # --- IGNITION SECTION ---
+  ignition:
+    image: inductiveautomation/ignition:latest
+    container_name: ignition-maker
+    restart: unless-stopped
+    ports:
+      - "8088:8088"
+      - "8043:8043"
+    volumes:
+      - ignition_data:/usr/local/bin/ignition/data
+    environment:
+      - ACCEPT_IGNITION_EULA=Y
+      - IGNITION_EDITION=maker
+      - GATEWAY_ADMIN_USERNAME=admin
+      - GATEWAY_ADMIN_PASSWORD=${IGNITION_ADMIN_PASSWORD}
+      - TZ=America/New_York
+    networks:
+      - automation_net
+      - ignition_internal
+      - proxy_net
+    deploy:
+      resources:
+        limits:
+          memory: 2048M
+        reservations:
+          memory: 512M
+
+  ignition-db:
+    image: mariadb:10.11
+    container_name: ignition-db
+    restart: unless-stopped
+    environment:
+      - MARIADB_ROOT_PASSWORD=${IGNITION_DB_ROOT_PASSWORD}
+      - MARIADB_DATABASE=ignition
+      - MARIADB_USER=ignition_user
+      - MARIADB_PASSWORD=${IGNITION_DB_PASSWORD}
+    volumes:
+      - /dockerfiles/automation/ignition/db-data:/var/lib/mysql
+    networks:
+      - ignition_internal
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 64M
+
+  # --- MONITORING SECTION ---
+  uptime-kuma:
+    image: louislam/uptime-kuma:latest
+    container_name: uptime-kuma
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    volumes:
+      - /dockerfiles/automation/uptime-kuma:/app/data
+    networks:
+      - automation_net
+      - proxy_net
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 128M
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    user: 1000:1000
+    restart: unless-stopped
+    ports:
+      - "9099:9090"
+    volumes:
+      - /dockerfiles/automation/prometheus:/etc/prometheus
+      - /dockerfiles/automation/prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    networks:
+      - automation_net
+      - monitoring_net
+    deploy:
+      resources:
+        limits:
+          memory: 1024M
+        reservations:
+          memory: 128M
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - /dockerfiles/automation/grafana-data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+    networks:
+      - monitoring_net
+      - proxy_net
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 128M
+
+networks:
+  automation_net:
+    name: automation_net
+  proxy_net:
+    external: true
+  monitoring_net:
+    internal: true
+  komodo_internal:
+    internal: true
+  ignition_internal:
+    internal: true
+
+volumes:
+  ignition_data:

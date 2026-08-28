@@ -1,0 +1,193 @@
+services:
+  # --- VPN LAYER (THE KILL-SWITCH) ---
+  gluetun:
+    image: qmcgaw/gluetun:latest
+    container_name: gluetun
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    ports:
+      - 8080:8080 # qBittorrent WebUI
+      - 8888:8888/tcp # HTTP Proxy
+      - 8388:8388/tcp # Shadowsocks
+      - 8388:8388/udp
+    volumes:
+      - /dockerfiles/networking/gluetun:/gluetun
+    environment:
+      - VPN_SERVICE_PROVIDER=airvpn
+      - VPN_TYPE=wireguard
+      - WIREGUARD_PRIVATE_KEY=${AIRVPN_PRIVATE_KEY}
+      - WIREGUARD_PRESHARED_KEY=${AIRVPN_PRESHARED_KEY}
+      - WIREGUARD_PUBLIC_KEY=${AIRVPN_PUBLIC_KEY}
+      - WIREGUARD_ADDRESSES=10.132.39.66/32
+      - FIREWALL_VPN_INPUT_PORTS=6657
+      - TZ=America/New_York
+      - DNS_UPSTREAM_PLAIN_ADDRESSES=1.1.1.1:53,8.8.8.8:53
+      - FIREWALL_OUTBOUND_SUBNETS=10.10.1.0/24,172.16.0.0/12
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "ip addr show tun0 | grep 'inet ' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - media_net
+      - proxy_net
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 64M
+
+  # --- DOWNLOADER LAYER ---
+  qbittorrent:
+    image: lscr.io/linuxserver/qbittorrent:4.6.5
+    container_name: qbittorrent
+    network_mode: service:gluetun
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - UMASK=002
+      - TZ=America/New_York
+      - WEBUI_PORT=8080
+      - QBIT_LEGAL=true
+    volumes:
+      - /dockerfiles/networking/qbittorrent:/config
+      - /NAS/data:/data
+    shm_size: "1gb"
+    depends_on:
+      gluetun:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 2048M
+        reservations:
+          memory: 384M
+
+  flaresolverr:
+    image: ghcr.io/flaresolverr/flaresolverr:latest
+    container_name: flaresolverr
+    restart: unless-stopped
+    networks:
+      - media_net
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 64M
+
+  # --- EXTERNAL ACCESS LAYER ---
+  nginx-proxy:
+    image: 'jc21/nginx-proxy-manager:latest'
+    container_name: nginx-proxy
+    dns:
+      - 8.8.8.8
+      - 8.8.8.4
+    ports:
+      - '80:80'
+      - '81:81'
+      - '443:443'
+    volumes:
+      - /dockerfiles/networking/nginx/data:/data
+      - /dockerfiles/networking/nginx/letsencrypt:/etc/letsencrypt
+    environment:
+      - PUID=1000
+      - PGID=1000
+    networks:
+      - proxy_net
+      - npm_internal
+    depends_on:
+      npm-db:
+        condition: service_started
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 128M
+
+  npm-db:
+    image: 'jc21/mariadb-aria:latest'
+    container_name: npm-db
+    command: --innodb=FORCE
+    environment:
+      - MYSQL_ROOT_PASSWORD=${NPM_DB_PASS}
+      - MYSQL_DATABASE=npm
+      - MYSQL_USER=npm
+      - MYSQL_PASSWORD=${NPM_DB_PASS}
+    volumes:
+      - /dockerfiles/networking/nginx/db:/var/lib/mysql
+    networks:
+      - npm_internal
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 32M
+
+  headscale:
+    image: headscale/headscale:latest
+    container_name: headscale
+    command: serve
+    volumes:
+      - /dockerfiles/networking/headscale/config:/etc/headscale
+      - /dockerfiles/networking/headscale/data:/var/lib/headscale
+    ports:
+      - "9090:9090"
+      - "9091:9091"
+    restart: unless-stopped
+    networks:
+      - proxy_net
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 32M
+
+  # --- CLOUDFLARE TUNNEL ---
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run --token eyJhIjoiYzY2Zjg4YjdhMTA4M2FjZDBkM2ZhYjI2ODk1ZGY4ZDQiLCJ0IjoiYWFiZjE2OTktOTI5NC00NjgxLWEwNzMtNDYzN2Y5ZTE5MGEwIiwicyI6Ik9HWTFOalk1WmpjdFlUQXhaaTAwT0RjekxUazJaR1V0Tnpnd01EazJabVZtTURsbSJ9
+    networks:
+      - proxy_net
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 32M
+
+  # --- DDB PROXY ---
+  ddb-proxy:
+    image: ghcr.io/mrprimate/ddb-proxy:latest
+    container_name: ddb-proxy
+    restart: unless-stopped
+    networks:
+      - proxy_net
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+        reservations:
+          memory: 16M
+
+networks:
+  media_net:
+    external: true
+  proxy_net:
+    name: proxy_net
+    external: true
+  npm_internal:
+    internal: true

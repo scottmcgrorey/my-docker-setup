@@ -1,0 +1,146 @@
+services:
+  # --- NEXTCLOUD: YOUR PERSONAL CLOUD ---
+  nextcloud-db:
+    image: postgres:15-alpine
+    container_name: nextcloud-db
+    restart: unless-stopped
+    volumes:
+      - /dockerfiles/data-cloud/nextcloud/db:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=nextcloud
+      - POSTGRES_USER=nextcloud
+      - POSTGRES_PASSWORD=${NEXTCLOUD_DB_PASS}
+    networks:
+      - cloud_internal
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 128M
+
+  nextcloud-redis:
+    image: redis:alpine
+    container_name: nextcloud-redis
+    restart: unless-stopped
+    networks:
+      - cloud_internal
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+        reservations:
+          memory: 16M
+
+  nextcloud:
+    image: nextcloud:latest
+    container_name: nextcloud
+    restart: unless-stopped
+    depends_on:
+      - nextcloud-db
+      - nextcloud-redis
+    environment:
+      - POSTGRES_HOST=nextcloud-db
+      - POSTGRES_DB=nextcloud
+      - POSTGRES_USER=nextcloud
+      - POSTGRES_PASSWORD=${NEXTCLOUD_DB_PASS}
+      - REDIS_HOST=nextcloud-redis
+    volumes:
+      - /dockerfiles/data-cloud/nextcloud/config:/var/www/html
+      - /NAS/data/nextcloud:/var/www/html/data
+    networks:
+      - cloud_internal
+      - proxy_net
+    deploy:
+      resources:
+        limits:
+          memory: 1024M
+        reservations:
+          memory: 256M
+
+  # --- IMMICH: HIGH-PERFORMANCE PHOTO BACKUP ---
+  immich-server:
+    container_name: immich_server
+    image: ghcr.io/immich-app/immich-server:release
+    volumes:
+      - /NAS/data/photos:/usr/src/app/upload
+      - /etc/localtime:/etc/localtime:ro
+    env_file: .env
+    environment:
+      - DB_HOSTNAME=immich_postgres
+      - REDIS_HOSTNAME=immich_redis
+    depends_on:
+      - immich-db
+      - immich-redis
+    restart: unless-stopped
+    networks:
+      - cloud_internal
+      - proxy_net
+    deploy:
+      resources:
+        limits:
+          memory: 1536M
+        reservations:
+          memory: 384M
+
+  immich-machine-learning:
+    container_name: immich_machine_learning
+    image: ghcr.io/immich-app/immich-machine-learning:release
+    volumes:
+      - /dockerfiles/data-cloud/immich/model-cache:/cache
+    env_file: .env
+    restart: unless-stopped
+    networks:
+      - cloud_internal
+    deploy:
+      resources:
+        limits:
+          memory: 2048M
+        reservations:
+          memory: 512M
+
+  immich-db:
+    container_name: immich_postgres
+    image: ghcr.io/immich-app/postgres:14-vectorchord0.4.3 
+    environment:
+      - POSTGRES_PASSWORD=${IMMICH_DB_PASS}
+      - POSTGRES_USER=immich
+      - POSTGRES_DB=immich
+    volumes:
+      - /dockerfiles/data-cloud/immich/db:/var/lib/postgresql/data
+    command: >
+      postgres 
+      -c shared_preload_libraries=vchord.so 
+      -c 'search_path="$$user", public, vectors' 
+      -c logging_collector=on 
+      -c max_wal_size=2GB 
+      -c shared_buffers=512MB 
+      -c wal_compression=on
+    restart: unless-stopped
+    networks:
+      - cloud_internal
+    deploy:
+      resources:
+        limits:
+          memory: 1024M
+        reservations:
+          memory: 256M
+
+  immich-redis:
+    container_name: immich_redis
+    image: redis:alpine
+    restart: unless-stopped
+    networks:
+      - cloud_internal
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+        reservations:
+          memory: 16M
+
+networks:
+  proxy_net:
+    external: true
+  cloud_internal:
+    internal: true

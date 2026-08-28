@@ -1,0 +1,174 @@
+services:
+  # --- TV SHOWS ---
+  sonarr:
+    image: lscr.io/linuxserver/sonarr:latest
+    container_name: sonarr
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - UMASK=002
+      - TZ=America/New_York
+    ports:
+      - 8989:8989
+    volumes:
+      - /dockerfiles/arr-library/sonarr:/config
+      - /NAS/data:/data
+    networks:
+      - media_net
+      - proxy_net
+    deploy:
+      resources:
+        limits:
+          memory: 1024M
+        reservations:
+          memory: 256M
+    restart: unless-stopped
+
+  maintainerr:
+    image: ghcr.io/jorenn92/maintainerr:latest
+    container_name: maintainerr
+    environment:
+      - TZ=America/New_York
+    volumes:
+      - /dockerfiles/arr-library/maintainerr:/opt/data
+    ports:
+      - 6246:6246
+    networks:
+      - media_net
+      - proxy_net
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 128M
+    restart: unless-stopped
+    depends_on:
+      - sonarr
+
+  # --- MOVIES ---
+  radarr:
+    image: lscr.io/linuxserver/radarr:latest
+    container_name: radarr
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - UMASK=002
+      - TZ=America/New_York
+    ports:
+      - 7878:7878
+    volumes:
+      - /dockerfiles/arr-library/radarr:/config
+      - /NAS/data:/data
+    networks:
+      - media_net
+      - proxy_net
+    deploy:
+      resources:
+        limits:
+          memory: 1024M
+        reservations:
+          memory: 256M
+    restart: unless-stopped
+
+  # --- MUSIC ---
+  lidarr:
+    image: lscr.io/linuxserver/lidarr:latest
+    container_name: lidarr
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - UMASK=002
+      - TZ=America/New_York
+    ports:
+      - 8686:8686
+    volumes:
+      - /dockerfiles/arr-library/lidarr:/config
+      - /NAS/data:/data
+    networks:
+      - media_net
+      - proxy_net
+    deploy:
+      resources:
+        limits:
+          memory: 768M
+        reservations:
+          memory: 200M
+    restart: unless-stopped
+
+  # --- BOOKS ---
+  lazylibrarian:
+    image: lscr.io/linuxserver/lazylibrarian:latest
+    container_name: lazylibrarian
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/New_York
+    volumes:
+      - /dockerfiles/arr-library/lazylibrarian:/config
+      - /NAS/data:/data
+    ports:
+      - 5299:5299
+    networks:
+      - media_net
+      - proxy_net
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 128M
+    restart: unless-stopped
+
+  # --- AUDIOBOOKS ---
+  audiobookshelf:
+    image: ghcr.io/advplyr/audiobookshelf:latest
+    container_name: audiobookshelf
+    environment:
+      - TZ=America/New_York
+    ports:
+      - 13378:80
+    volumes:
+      - /dockerfiles/arr-library/audiobookshelf/config:/config
+      - /dockerfiles/arr-library/audiobookshelf/metadata:/metadata
+      - /NAS/data:/data
+    networks:
+      - media_net
+      - proxy_net
+    deploy:
+      resources:
+        limits:
+          memory: 1536M
+        reservations:
+          memory: 384M
+    restart: unless-stopped
+
+  # --- COMICS ---
+  mylar3:
+    image: lscr.io/linuxserver/mylar3:latest
+    container_name: mylar3
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/New_York
+    volumes:
+      - /dockerfiles/arr-library/mylar3:/config
+      - /NAS/data:/data
+    ports:
+      - 8090:8090
+    networks:
+      - media_net
+      - proxy_net
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 128M
+    restart: unless-stopped
+
+networks:
+  media_net:
+    external: true
+  proxy_net:
+    external: true
