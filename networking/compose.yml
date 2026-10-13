@@ -162,7 +162,7 @@ services:
       - 1.1.1.1
       - 8.8.8.8
     restart: unless-stopped
-    command: tunnel --no-autoupdate run --token eyJhIjoiYzY2Zjg4YjdhMTA4M2FjZDBkM2ZhYjI2ODk1ZGY4ZDQiLCJ0IjoiYWFiZjE2OTktOTI5NC00NjgxLWEwNzMtNDYzN2Y5ZTE5MGEwIiwicyI6Ik9HWTFOalk1WmpjdFlUQXhaaTAwT0RjekxUazJaR1V0Tnpnd01EazJabVZtTURsbSJ9
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
     networks:
       - proxy_net
     deploy:
