@@ -1,0 +1,103 @@
+---
+- Media:
+    - Plex:
+        href: http://10.10.1.11:32400/
+        icon: plex.png
+        widget:
+          type: plex
+          url: http://10.10.1.11:32400
+          key: BfHiLKuEmPY9YBApizG8
+    - Sonarr:
+        href: http://10.10.1.35:8989
+        container: sonarr
+        server: my-docker
+        icon: sonarr.png
+        widget:
+          type: sonarr
+          url: http://sonarr:8989
+          key: "410bed61d5b54c01b8a82f1544d8db78"
+    - Radarr:
+        href: http://10.10.1.35:7878
+        container: radarr
+        server: my-docker
+        icon: radarr.png
+        widget:
+          type: radarr
+          url: http://radarr:7878
+          key: "d2664c0512024858bd42a34dadb59e4e"
+    - Prowlarr:
+        href: http://10.10.1.35:9696
+        container: prowlarr
+        server: my-docker
+        icon: prowlarr.png
+        widget:
+          type: prowlarr
+          url: http://prowlarr:9696
+          key: "08877067810241a8b025aa3897ef5249"
+    - qBittorrent:
+        href: http://10.10.1.35:8080
+        container: qbittorrent
+        server: my-docker
+        icon: qbittorrent.png
+        widget:
+          type: qbittorrent
+          url: http://10.10.1.35:8080
+          username: admin
+          password: 748bd2996db1e195ac3d94629c0eec4d
+
+- Infrastructure:
+    - Authentik:
+        href: https://auth.mcgrorey.net
+        container: authentik-server
+        server: my-docker
+        icon: authentik.png
+    - Vaultwarden:
+        href: https://vault.mcgrorey.net
+        container: vaultwarden
+        server: my-docker
+        icon: vaultwarden.png
+    - NetBox:
+        href: http://10.10.1.35:8085
+        icon: netbox.png
+        widget:
+          type: custom
+          url: http://10.10.1.35:8085/api/ipam/ip-addresses/?limit=1
+          method: get
+          headers:
+            Authorization: Token IGj85ghhGVYm52JD5eg3nnyZ1Iqzyr2J6hIFRg2e
+          mappings:
+            - field: count
+              label: Total IPs
+              format: number
+- Automation:
+    - Home Assistant:
+        href: http://10.10.1.31:8123
+        icon: home-assistant.png
+        widget:
+          type: homeassistant
+          url: http://10.10.1.31:8123
+          key: ${HA_TOKEN}
+    - Ignition:
+        href: http://10.10.1.35:8088
+        container: ignition
+        server: my-docker
+        icon: ignition.png
+
+- Portals & Community:
+    - Discord Server:
+        href: https://discord.com/channels/1057427700278644857
+        icon: discord.png
+    - Magical Memories Manor:
+        href: https://magicalmemoriesredirect.com
+        icon: airbnb.png
+    - Solara Guest Portal:
+        href: https://testing.magicalmemoriesredirect.com
+        icon: safari.png
+    - S/V Karma:
+        href: https://svkarma.net
+        icon: boat.png
+    - Tautulli:
+        href: http://10.10.1.36:8181
+        container: tautulli
+        server: my-docker
+        icon: tautulli.png

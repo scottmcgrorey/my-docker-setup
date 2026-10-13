@@ -46,7 +46,6 @@ services:
         reservations:
           memory: 200M
     restart: unless-stopped
-
 networks:
   media_net:
     external: true

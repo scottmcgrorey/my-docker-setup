@@ -96,30 +96,6 @@ services:
           memory: 200M
     restart: unless-stopped
 
-  # --- BOOKS ---
-  lazylibrarian:
-    image: lscr.io/linuxserver/lazylibrarian:latest
-    container_name: lazylibrarian
-    environment:
-      - PUID=1000
-      - PGID=1000
-      - TZ=America/New_York
-    volumes:
-      - /dockerfiles/arr-library/lazylibrarian:/config
-      - /NAS/data:/data
-    ports:
-      - 5299:5299
-    networks:
-      - media_net
-      - proxy_net
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-        reservations:
-          memory: 128M
-    restart: unless-stopped
-
   # --- AUDIOBOOKS ---
   audiobookshelf:
     image: ghcr.io/advplyr/audiobookshelf:latest
@@ -156,6 +132,29 @@ services:
       - /NAS/data:/data
     ports:
       - 8090:8090
+    networks:
+      - media_net
+      - proxy_net
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 128M
+    restart: unless-stopped
+
+  # --- MONITORING ---
+  tautulli:
+    image: lscr.io/linuxserver/tautulli:latest
+    container_name: tautulli
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/New_York
+    volumes:
+      - /dockerfiles/arr-library/tautulli:/config
+    ports:
+      - 8181:8181
     networks:
       - media_net
       - proxy_net

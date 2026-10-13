@@ -48,8 +48,7 @@ networks:
   # Internal network for n8n to talk to its private DB
   n8n_internal:
     driver: bridge
-  # External networks for your existing ecosystem
-  proxy_net:
-    external: true
   automation_net:
+    external: true
+  proxy_net:
     external: true

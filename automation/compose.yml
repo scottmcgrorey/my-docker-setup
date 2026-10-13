@@ -7,6 +7,8 @@ services:
       komodo.skip: ""
     command: --quiet --wiredTigerCacheSizeGB 0.25
     restart: unless-stopped
+    tmpfs:
+      - /tmp:mode=1777
     volumes:
       - /dockerfiles/automation/mongo-data:/data/db
       - /dockerfiles/automation/mongo-config:/data/configdb
@@ -34,9 +36,9 @@ services:
       - 9120:9120
     env_file: /dockerfiles/automation/compose.env
     environment:
-      KOM_DATABASE_ADDRESS: komodo-mongo:27017
-      KOM_DATABASE_USERNAME: ${KOMODO_DB_USERNAME:-komodo}
-      KOM_DATABASE_PASSWORD: ${KOMODO_DB_PASSWORD:-komodo}
+      KOMODO_DATABASE_ADDRESS: komodo-mongo:27017
+      KOMODO_DATABASE_USERNAME: ${KOMODO_DB_USERNAME:-komodo}
+      KOMODO_DATABASE_PASSWORD: ${KOMODO_DB_PASSWORD:-komodo}
     volumes:
       - /dockerfiles/automation/backups:/backups
     networks:
@@ -207,6 +209,9 @@ services:
       - /dockerfiles/automation/grafana-data:/var/lib/grafana
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+      - GF_SECURITY_ALLOW_EMBEDDING=true
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
     networks:
       - monitoring_net
       - proxy_net
@@ -219,7 +224,7 @@ services:
 
 networks:
   automation_net:
-    name: automation_net
+    external: true
   proxy_net:
     external: true
   monitoring_net:

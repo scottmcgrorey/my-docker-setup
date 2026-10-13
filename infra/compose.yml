@@ -82,6 +82,7 @@ services:
   authentik-postgresql:
     image: postgres:16-alpine
     container_name: authentik-db
+    restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
       start_period: 20s
@@ -105,6 +106,7 @@ services:
   authentik-redis:
     image: redis:alpine
     container_name: authentik-redis
+    restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
       start_period: 10s
@@ -122,6 +124,7 @@ services:
   authentik-server:
     image: ghcr.io/goauthentik/server
     container_name: authentik-server
+    restart: unless-stopped
     user: "1000:1000"
     command: server
     environment:
@@ -181,6 +184,7 @@ services:
   netbox-db:
     image: postgres:16-alpine
     container_name: netbox-db
+    restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
       start_period: 20s
@@ -205,6 +209,7 @@ services:
   netbox-redis:
     image: redis:7-alpine
     container_name: netbox-redis
+    restart: unless-stopped
     networks:
       - netbox_internal
     deploy:
@@ -216,6 +221,7 @@ services:
 
   netbox:
     image: netbox-custom:latest
+    restart: unless-stopped
     build:
       context: .
       dockerfile_inline: |
@@ -259,6 +265,7 @@ services:
   netbox-worker:
     image: netbox-custom:latest
     container_name: netbox-worker
+    restart: unless-stopped
     depends_on:
       - netbox
     command: /opt/netbox/venv/bin/python3 /opt/netbox/netbox/manage.py rqworker
@@ -281,11 +288,13 @@ services:
           memory: 128M
 
 networks:
-  media_net:
-    external: true
   proxy_net:
+    external: true
+  media_net:
     external: true
   auth_internal:
     internal: true
   netbox_internal:
+    internal: true
+  infra_internal:
     internal: true

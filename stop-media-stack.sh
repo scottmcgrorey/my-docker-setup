@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Define the root directory
-DOCKER_ROOT="/etc/dockerfiles"
+DOCKER_ROOT="/dockerfiles"
 
 # Define the stacks in REVERSE order of dependency
 # 1. Apps (Arrs/Automation) go down first

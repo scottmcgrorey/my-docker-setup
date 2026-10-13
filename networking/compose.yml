@@ -158,6 +158,9 @@ services:
   cloudflared:
     image: cloudflare/cloudflared:latest
     container_name: cloudflared
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     restart: unless-stopped
     command: tunnel --no-autoupdate run --token eyJhIjoiYzY2Zjg4YjdhMTA4M2FjZDBkM2ZhYjI2ODk1ZGY4ZDQiLCJ0IjoiYWFiZjE2OTktOTI5NC00NjgxLWEwNzMtNDYzN2Y5ZTE5MGEwIiwicyI6Ik9HWTFOalk1WmpjdFlUQXhaaTAwT0RjekxUazJaR1V0Tnpnd01EazJabVZtTURsbSJ9
     networks:
@@ -183,11 +186,29 @@ services:
         reservations:
           memory: 16M
 
+  # --- CLOUDFLARE DYNAMIC DNS ---
+  cloudflare-ddns:
+    image: favonia/cloudflare-ddns:latest
+    container_name: cloudflare-ddns
+    restart: unless-stopped
+    environment:
+      - CLOUDFLARE_API_TOKEN=${CF_API_TOKEN}
+      - DOMAINS=mcgrorey.net
+      - PROXIED=false
+      - UPDATE_CRON=@every 5m
+    networks:
+      - proxy_net
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+        reservations:
+          memory: 16M
+
 networks:
   media_net:
     external: true
   proxy_net:
-    name: proxy_net
     external: true
   npm_internal:
     internal: true

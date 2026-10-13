@@ -1,0 +1,34 @@
+---
+# For configuration options and examples, please see:
+# https://gethomepage.dev/configs/bookmarks
+
+- Torrent:
+    - Seedit4me:
+        - abbr: SI
+          href: https://seedit4.me/
+    - Broadcasthenet:
+        - abbr: BC
+          href: https://broadcasthe.net/index.php
+
+- Entertainment:
+    - YouTube:
+        - abbr: YT
+          href: https://youtube.com/
+    - PLEX:
+        - abbr: PX
+          href: http://10.10.1.11:32400/web/
+
+- Social:
+    - Reddit:
+        - abbr: RE
+          href: https://reddit.com/
+    - Discord:
+        - abbr: DI
+          href: https://discord.com/
+    - HomePage (Local):
+        - abbr: HP
+          href: http://10.10.1.35:3000/
+    - HomePage (Remote):
+        - abbr: HPFL
+          href: http://10.20.1.17:3000/
+

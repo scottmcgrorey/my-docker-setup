@@ -1,0 +1,5 @@
+---
+cluster:
+  url: https://10.10.1.21:8006/api2/json
+  token: ${PROX_API_KEY}
+  verify_ssl: false

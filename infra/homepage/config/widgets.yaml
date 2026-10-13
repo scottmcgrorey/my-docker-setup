@@ -1,0 +1,37 @@
+---
+- greeting:
+    text_size: xl
+    text: Welcome home, Scott.
+
+- resources:
+    cpu: true
+    memory: true
+    disk: /
+
+- docker:
+    label: Docker Host
+    server: my-docker
+
+- proxmox:
+    label: Proxmox Cluster
+    cluster: cluster
+    nodes:
+      - 10.10.1.21
+      - 10.10.1.22
+      - 10.10.1.23
+      - 10.10.1.24
+      - 10.10.1.25
+
+- datetime:
+    format:
+      timeStyle: short
+      dateStyle: short
+
+- search:
+    provider: google
+    target: _blank
+
+- openmeteo:
+    label: Local Weather
+    latitude: 38.55
+    longitude: -76.61

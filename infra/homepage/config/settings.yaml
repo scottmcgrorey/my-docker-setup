@@ -1,0 +1,18 @@
+---
+title: McGrorey Home Dashboard
+theme: dark
+color: slate
+headerStyle: underlined
+background: https://images.unsplash.com/photo-1672288072591-619afe830096?auto=format&fit=crop&w=1920&q=80
+backgroundOpacity: 0.5
+
+layout:
+  Media:
+    style: row
+    columns: 3
+  Automation:
+    style: row
+    columns: 3
+  Infrastructure:
+    style: row
+    columns: 2
